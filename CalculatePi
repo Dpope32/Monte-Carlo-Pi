@@ -1,0 +1,83 @@
+#include <omp.h>
+#include <iostream>
+#include <cmath>
+#include <cstdlib>
+using namespace std;
+
+double getRand();
+long double Calculate_Pi_Sequential(long long);
+long double Calculate_Pi_Parallel(long long);
+
+int main() {
+    clock_t start, end;
+
+    long long num_points = 10000000;
+
+    printf("Timing sequential...\n");
+    start = clock();
+    long double sequential_pi = Calculate_Pi_Sequential(num_points);
+    end = clock();
+    printf("Took %f seconds\n\n", (double)(end - start) / CLOCKS_PER_SEC);
+
+    printf("Timing parallel...\n");
+    start = clock();
+    long double parallel_pi = Calculate_Pi_Parallel(num_points);
+    end = clock();
+    printf("Took %f seconds\n\n", (double)(end - start) / CLOCKS_PER_SEC);
+
+    // This will print the result to 10 decimal places
+    printf("Pi = %.10Lf (sequential)\n", sequential_pi);
+    printf("Pi = %.10Lf (parallel)\n", parallel_pi);
+
+    return 0;
+}
+
+// Returns a random value between -1 and 1
+double getRand() {
+    return (double)rand() * 2 / (double)(RAND_MAX)-1;
+}
+
+long double Calculate_Pi_Sequential(long long number_of_points) {
+    srand(time(NULL));
+
+    long long num_points_in_circle = 0;
+
+    for (long long i = 0; i < number_of_points; i++) {
+        double x = getRand();
+        double y = getRand();
+
+        if (sqrt(x * x + y * y) <= 1) {
+            num_points_in_circle++;
+        }
+    }
+
+    return 4.0 * num_points_in_circle / number_of_points;
+}
+
+long double Calculate_Pi_Parallel(long long number_of_points) {
+    srand(time(NULL) + omp_get_thread_num());
+
+    long long num_points_in_circle = 0;
+
+# pragma omp parallel num_threads(omp_get_max_threads())
+    {
+        long long local_num_points_in_circle = 0;
+
+        // Split the work among threads
+# pragma omp for
+        for (long long i = 0; i < number_of_points; i++) {
+            double x = getRand();
+            double y = getRand();
+
+            if (sqrt(x * x + y * y) <= 1) {
+                local_num_points_in_circle++;
+            }
+        }
+
+        // Merge the results from each thread
+# pragma omp critical
+        num_points_in_circle += local_num_points_in_circle;
+    }
+
+    return 4.0 * num_points_in_circle / number_of_points;
+}
